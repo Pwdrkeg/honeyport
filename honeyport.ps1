@@ -1,4 +1,3 @@
-
 <#
 .Synopsis
     Block IP Addresses that connect to a specified port.
@@ -96,7 +95,7 @@ Check-HoneyPortEvent
 if (Check-IsAdmin) {
     foreach($port in $Ports) {
         $log = "HoneyPort has started listening for connections on port $port"        
-	      write-eventlog -logname HoneyPort -source BlueKit -eventID 1001 -entrytype Information -message $log
+	write-eventlog -logname HoneyPort -source BlueKit -eventID 1001 -entrytype Information -message $log
         Write "Starting job that will listen for connections on port $port"
         Start-Job -ScriptBlock {
             param($port, $whitelist)
@@ -129,8 +128,8 @@ if (Check-IsAdmin) {
                       $rule.Enabled = $True
                       $firewall.Rules.Add($rule)
                       write "Host has been blocked."
-		                  $logIP = "$IP has been blocked on port $port"
-		                  write-eventlog -logname HoneyPort -source BlueKit -eventID 1002 -entrytype Information -message $logIP
+		      $logIP = "$IP has been blocked on port $port"
+		      write-eventlog -logname HoneyPort -source BlueKit -eventID 1002 -entrytype Information -message $logIP
                       $client.Close()
                       $listener.stop()	
                       Write "Connection closed"
