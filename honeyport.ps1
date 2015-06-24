@@ -152,7 +152,23 @@ if (Check-IsAdmin) {
             }
         } -ArgumentList $port,$WhiteList,$Block -Name "HoneyPort" -ErrorAction Stop
     }
-}
-else {
+
+    # Terminate Honeyport and Log Job Completion
+    Write-Host "To terminate the HoneyPort, create the file $PSScriptRoot\stop.txt"
+
+    # Wait for terminate 'command'
+
+    while ($true) {
+        start-sleep 60
+        if (Test-Path "$PSScriptRoot\stop.txt") {
+            stop-job HoneyPort
+            remove-job HoneyPort
+            $log = "HoneyPort has stopped listening for connections on all ports"
+            Write-EventLog -LogName HoneyPort -source BlueKit -eventID 1003 -entrytype Information -message $log
+            break
+        }
+    }
+    
+} else {
     Write-Error "Script needs to be run with higher privileges"
 }
