@@ -25,7 +25,7 @@
 
 .EXAMPLE
     Example monitoring on one port and blocking on full TCP connect
-        PS C:\> .\honeyport.ps1 -Ports 21 -Block
+        PS C:\> .\honeyport.ps1 -Ports 21 -Block $true 
 
 .NOTES
     Authors: John Hoyt, Carlos Perez
@@ -104,7 +104,7 @@ if (Check-IsAdmin) {
 	    write-eventlog -logname HoneyPort -source BlueKit -eventID 1001 -entrytype Information -message $log
         Write "Starting job that will listen for connections on port $port"
         Start-Job -ScriptBlock {
-            param($port, $whitelist)
+            param($port, $whitelist, $Block)
             # Create Objects needed.
             $endpoint = new-object System.Net.IPEndPoint([system.net.ipaddress]::any, $port)
             $listener = new-object System.Net.Sockets.TcpListener $endpoint
