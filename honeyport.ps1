@@ -1,12 +1,13 @@
 <#
-.Synopsis
+.SYNOPSIS
     Block IP Addresses that connect to a specified port.
 
 .DESCRIPTION
     Creates a job that listens on TCP Ports specified and when 
-    a connection is established, it adds a local firewall 
-    rule to block the host from further connections.
-    Writes blocked IPs to the event log named HoneyPort.
+    a connection is established, it can either simply log or
+    add a local firewall rule to block the host from further
+    connections.
+    Writes blocked/probed IPs to the event log named HoneyPort.
 
 .PARAMETER  Ports
     List of Ports to listen in for connections.
@@ -15,24 +16,27 @@
     List of IP Addresses that should not be blocked.
 
 .EXAMPLE
-   Example monitoring on different ports
-    PS C:\> .\honeyport.ps1 -Ports 70,79 -Verbose
+    Example monitoring on different ports
+        PS C:\> .\honeyport.ps1 -Ports 70,79 -Verbose
 
 .EXAMPLE
-   Example monitoring on different ports and add whitelist of hosts
-   PS C:\> .\honeyport.ps1 -Ports 4444,22,21,23 -WhiteList 192.168.10.1,192.168.10.2 -Verbose
+    Example monitoring on different ports and add whitelist of hosts
+        PS C:\> .\honeyport.ps1 -Ports 4444,22,21,23 -WhiteList 192.168.10.1,192.168.10.2 -Verbose
+
+.EXAMPLE
+    Example monitoring on one port and blocking on full TCP connect
+        PS C:\> .\honeyport.ps1 -Ports 21 -Block $true 
 
 .NOTES
-   Authors: John Hoyt, Carlos Perez
+    Authors: John Hoyt, Carlos Perez
+    Original Script Modified By: Greg Foss
 
-   Stopping HoneyPort; 
-  stop-job -name HoneyPort
-	remove-job -name HoneyPort
+    Stopping HoneyPort; 
+        PS C:\> stop-job -name HoneyPort
+        PS C:\> remove-job -name HoneyPort
 
-   Listing Events;
-	get-eventlog HoneyPort
-
-   
+    Listing Events;
+        PS C:\> get-eventlog HoneyPort
 #>
     
 [CmdletBinding()]
@@ -44,7 +48,9 @@ param(
     [Alias("PortNumber")]
     [int32[]]$Ports,
 
-    [string[]]$WhiteList
+    [string[]]$WhiteList,
+
+    [switch[]]$Block = $false
 ) 
 
 function Check-IsAdmin{
@@ -95,10 +101,10 @@ Check-HoneyPortEvent
 if (Check-IsAdmin) {
     foreach($port in $Ports) {
         $log = "HoneyPort has started listening for connections on port $port"        
-	write-eventlog -logname HoneyPort -source BlueKit -eventID 1001 -entrytype Information -message $log
+	    write-eventlog -logname HoneyPort -source BlueKit -eventID 1001 -entrytype Information -message $log
         Write "Starting job that will listen for connections on port $port"
         Start-Job -ScriptBlock {
-            param($port, $whitelist)
+            param($port, $whitelist, $Block)
             # Create Objects needed.
             $endpoint = new-object System.Net.IPEndPoint([system.net.ipaddress]::any, $port)
             $listener = new-object System.Net.Sockets.TcpListener $endpoint
@@ -113,6 +119,7 @@ if (Check-IsAdmin) {
 
                 # If the IP is not on the whitelist we block it
     
+            if ($Block -eq $true) {
                 if ($WhiteList -notcontains $IP){
                       write "The following host attempted to connect: $IP"
                       #Add firewall rule to block inbound scanner.
@@ -128,17 +135,24 @@ if (Check-IsAdmin) {
                       $rule.Enabled = $True
                       $firewall.Rules.Add($rule)
                       write "Host has been blocked."
-		      $logIP = "$IP has been blocked on port $port"
-		      write-eventlog -logname HoneyPort -source BlueKit -eventID 1002 -entrytype Information -message $logIP
+		              $logIP = "$IP has been blocked on port $port"
+		              write-eventlog -logname HoneyPort -source BlueKit -eventID 1002 -entrytype Information -message $logIP
                       $client.Close()
                       $listener.stop()	
                       Write "Connection closed"
                 }
-    
+            } Else {
+                $logIP = "$IP has probed the HoneyPort on port $port"
+                write-eventlog -logname HoneyPort -source BlueKit -eventID 1002 -entrytype Information -message $logIP
+                $client.Close()
+                $listener.stop()	
+                Write "Connection closed"
             }
-        } -ArgumentList $port,$WhiteList -Name "HoneyPort" -ErrorAction Stop
+
+            }
+        } -ArgumentList $port,$WhiteList,$Block -Name "HoneyPort" -ErrorAction Stop
     }
 }
 else {
-    Write-Error "Script needs to be ran with higher privileges"
+    Write-Error "Script needs to be run with higher privileges"
 }
